@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="mushroomai.Main" />
+    <module name="MushroomAI" />
+    <option name="PROGRAM_PARAMETERS" value="-Djava.library.path=C:\Users\nikla\myenv\Lib\site-packages\jep " />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
