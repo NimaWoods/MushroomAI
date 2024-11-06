@@ -47,3 +47,4 @@ target/
 *.log.3
 /server/src/main/java/server/model/
 /server/src/main/java/server/python/venv/
+/server/src/main/java/server/python/model/
