@@ -2,6 +2,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 import requests
 import os
+from huggingface_hub import login
+
+# Login bei Hugging Face
+login(token="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")
 
 # Funktion zum Herunterladen mit Fortschrittsanzeige
 def download_with_progress(url, destination):
@@ -9,6 +13,7 @@ def download_with_progress(url, destination):
     if response.status_code != 200:
         print(f"Fehler beim Herunterladen von {url}")
         return False
+
     total_size = int(response.headers.get('content-length', 0))
     with open(destination, 'wb') as file, tqdm(
             desc=destination,
@@ -21,7 +26,6 @@ def download_with_progress(url, destination):
             file.write(data)
             bar.update(len(data))
     return True
-
 
 # Modell und Tokenizer herunterladen und speichern
 def download_model(model_name="mistralai/Mistral-7B-v0.3", save_directory="./model"):
@@ -43,7 +47,6 @@ def download_model(model_name="mistralai/Mistral-7B-v0.3", save_directory="./mod
         print("Download abgeschlossen und Modell gespeichert.")
     except Exception as e:
         print(f"Fehler beim Herunterladen des Modells oder Tokenizers: {e}")
-
 
 if __name__ == "__main__":
     download_model()

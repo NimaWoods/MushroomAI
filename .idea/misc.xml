@@ -8,10 +8,6 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/pom.xml" />
-        <option value="$PROJECT_DIR$/src/main/java/mushroomai/server/pom.xml" />
-        <option value="$PROJECT_DIR$/src/main/java/server/pom.xml" />
-        <option value="$PROJECT_DIR$/client/pom.xml" />
-        <option value="$PROJECT_DIR$/server/pom.xml" />
       </list>
     </option>
   </component>
