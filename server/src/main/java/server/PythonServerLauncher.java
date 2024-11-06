@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
 
+import static server.Constants.PATHS.*;
+
 public class PythonServerLauncher {
 
 	public static void main(String[] args) {
@@ -29,12 +31,7 @@ public class PythonServerLauncher {
 		Process apiServerProcess = null;
 		Process downloadProcess = null;
 
-		String BASE_FOLDER = "server/src/main/java/server/";
-		String PYTHON_FOLDER = BASE_FOLDER + "python/";
-		String MODEL_FOLDER = BASE_FOLDER + "model/";
-		String REQUIREMENTS_FILE = PYTHON_FOLDER + "requirements.txt";
-
-		Path venvPath = Path.of(PYTHON_FOLDER + "venv");
+		Path venvPath = Path.of(PYTHON_FOLDER.getPath() + "venv");
 		String pipExecutable = venvPath + "/Scripts/pip";
 
 		try {
@@ -57,7 +54,7 @@ public class PythonServerLauncher {
 
 			// Install dependencies
 			System.out.println("Installing Python dependencies...");
-			ProcessBuilder pipInstall = new ProcessBuilder(pipExecutable, "install", "-r", REQUIREMENTS_FILE);
+			ProcessBuilder pipInstall = new ProcessBuilder(pipExecutable, "install", "-r", REQUIREMENTS_FILE.getPath());
 			Process pipProcess = pipInstall.start();
 
 			// Read output from the pip installation process
@@ -74,7 +71,7 @@ public class PythonServerLauncher {
 			System.out.println("Python dependencies installed successfully.");
 
 			// Check if model folder exists
-			Path modelFolder = Path.of(MODEL_FOLDER);
+			Path modelFolder = Path.of(MODEL_FOLDER.getPath());
 			if (Files.notExists(modelFolder)) {
 				System.out.println("Model folder does not exist. Creating...");
 				Files.createDirectory(modelFolder);
@@ -88,7 +85,7 @@ public class PythonServerLauncher {
 
 				if (!modelExists) {
 					System.out.println("Model folder is empty. Downloading model...");
-					downloadProcess = new ProcessBuilder(pipExecutable, "download", "-d", MODEL_FOLDER, "mushroomai-model").start();
+					downloadProcess = new ProcessBuilder(pipExecutable, "python ", PYTHON_FOLDER.getPath(), "Downloader.py").start();
 					downloadProcess.waitFor();
 					System.out.println("Model downloaded successfully.");
 				}

@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
 
+import static server.Constants.PATHS.PYTHON_FOLDER;
+
 @SpringBootApplication
 @RestController
 @RequestMapping("/api/chat")
@@ -46,7 +48,7 @@ public class APIServerController {
 	}
 
 	private static String getResponse(String prompt) throws IOException, InterruptedException {
-		ProcessBuilder processBuilder = new ProcessBuilder("python3", "src/main/java/mushroomai/server/python/AIServer.py", prompt);
+		ProcessBuilder processBuilder = new ProcessBuilder(PYTHON_FOLDER.getPath() + "python3", "AIServer.py", prompt);
 		processBuilder.redirectErrorStream(true);
 		Process process = processBuilder.start();
 
