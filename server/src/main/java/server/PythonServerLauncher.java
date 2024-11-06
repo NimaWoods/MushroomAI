@@ -1,7 +1,5 @@
 package server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -15,12 +13,17 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class PythonServerLauncher {
 
-	private static final Path VENV_PATH = Path.of("server/src/main/java/server/python/venv");
+	private static final Path VENV_PATH = Path.of("server/src/main/java/server/python/venv/");
+	private static final String OS_PIP_FORMAT = isWindows() ? "Scripts\\pip.exe" : "bin/pip";
+	private static final String PIP_EXECUTABLE = VENV_PATH + "\\" + OS_PIP_FORMAT;
 	private static final String REQUIREMENTS_PATH = "server/src/main/java/server/python/requirements.txt";
 	private static final Path MODEL_FOLDER_PATH = Path.of("server/src/main/java/server/model/");
-	private static String pipExecutable;
+	private static final String VENV_EXCECUTABLE = VENV_PATH + "\\" + "Scripts\\python.exe";
+	private static final String SYSTEM_PYTHON_EXECUTABLE = isWindows() ? "python" : "python3";
 
 	public static void main(String[] args) {
 		System.out.println("Starting API server...");
@@ -33,14 +36,11 @@ public class PythonServerLauncher {
 		Process apiServerProcess = null;
 		Process downloadProcess = null;
 
-		pipExecutable = VENV_PATH + (isWindows() ? "/Scripts/pip.exe" : "/bin/pip");
-
 		try {
 			setupVirtualEnvironment();
 			installPythonDependencies();
 			downloadModelIfNeeded();
 
-			// Loop for API testing
 			try (Scanner scanner = new Scanner(System.in)) {
 				while (true) {
 					System.out.println("\nEnter a prompt:");
@@ -62,16 +62,45 @@ public class PythonServerLauncher {
 	private static void setupVirtualEnvironment() throws IOException, InterruptedException {
 		if (Files.notExists(VENV_PATH)) {
 			System.out.println("Creating virtual environment...");
-			new ProcessBuilder("python", "-m", "venv", VENV_PATH.toString()).start().waitFor();
+
+			// Start the process to create the virtual environment
+			ProcessBuilder processBuilder = new ProcessBuilder(SYSTEM_PYTHON_EXECUTABLE, "-m", "venv", VENV_PATH.toString());
+			Process process = processBuilder.start();
+
+			// Capture and print the output and error streams
+			try (BufferedReader outputReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+					BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+
+				String line;
+
+				// Read and print output stream (normal log messages)
+				while ((line = outputReader.readLine()) != null) {
+					System.out.println("Output: " + line);
+				}
+
+				// Read and print error stream (error messages)
+				while ((line = errorReader.readLine()) != null) {
+					System.err.println("Error: " + line);
+
+				}
+			}
+
+			// Wait for the process to complete
+			int exitCode = process.waitFor();
+			if (exitCode == 0) {
+				System.out.println("Virtual environment created successfully.");
+			} else {
+				System.err.println("Failed to create virtual environment. Exit code: " + exitCode);
+			}
 		}
 	}
 
 	private static void installPythonDependencies() throws IOException, InterruptedException {
 		System.out.println("Updating pip...");
-		new ProcessBuilder(pipExecutable, "install", "--upgrade", "pip").start().waitFor();
+		new ProcessBuilder(VENV_EXCECUTABLE , "pip", "install", "--upgrade", "pip").start().waitFor();
 
 		System.out.println("Installing Python dependencies...");
-		Process pipProcess = new ProcessBuilder(pipExecutable, "install", "-r", REQUIREMENTS_PATH).start();
+		Process pipProcess = new ProcessBuilder(VENV_EXCECUTABLE , "pip", "install", "-r", REQUIREMENTS_PATH).start();
 
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(pipProcess.getInputStream()));
 			 BufferedReader errorReader = new BufferedReader(new InputStreamReader(pipProcess.getErrorStream()))) {
@@ -99,7 +128,7 @@ public class PythonServerLauncher {
 			boolean modelExists = stream.iterator().hasNext();
 			if (!modelExists) {
 				System.out.println("Model folder is empty. Downloading model...");
-				ProcessBuilder processBuilder = new ProcessBuilder("python", "server/src/main/java/server/python/Downloader.py");
+				ProcessBuilder processBuilder = new ProcessBuilder(VENV_EXCECUTABLE, "server/src/main/java/server/python/Downloader.py");
 				Process downloadProcess = processBuilder.start();
 
 				// Separate Threads to read output and error streams
