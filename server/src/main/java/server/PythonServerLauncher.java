@@ -12,30 +12,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PythonServerLauncher {
 
 	private static final Path VENV_PATH = Path.of("server/src/main/java/server/python/venv/");
-	private static final String OS_PIP_FORMAT = isWindows() ? "Scripts\\pip.exe" : "bin/pip";
-	private static final String PIP_EXECUTABLE = VENV_PATH + "\\" + OS_PIP_FORMAT;
-	private static final String REQUIREMENTS_PATH = "server/src/main/java/server/python/requirements.txt";
+	private static final Path REQUIREMENTS_PATH = Path.of("server/src/main/java/server/python/requirements.txt");
 	private static final Path MODEL_FOLDER_PATH = Path.of("server/src/main/java/server/model/");
-	private static final String VENV_EXCECUTABLE = VENV_PATH + "\\" + "Scripts\\python.exe";
+	private static final Path VENV_EXECUTABLE = isWindows() ? VENV_PATH.resolve("Scripts/python.exe") : VENV_PATH.resolve("bin/python");
 	private static final String SYSTEM_PYTHON_EXECUTABLE = isWindows() ? "python" : "python3";
 
 	public static void main(String[] args) {
 		System.out.println("Starting API server...");
 		APIServerController.startServer(args);
-
 		launch();
 	}
 
 	public static void launch() {
-		Process apiServerProcess = null;
-		Process downloadProcess = null;
-
 		try {
 			setupVirtualEnvironment();
 			installPythonDependencies();
@@ -48,13 +41,10 @@ public class PythonServerLauncher {
 					sendApiRequest(prompt);
 				}
 			}
-
 		} catch (IOException | InterruptedException e) {
-			System.err.println("An error occurred during the setup: " + e.getMessage());
+			System.err.println("Setup error: " + e.getMessage());
 			e.printStackTrace();
 		} finally {
-			if (apiServerProcess != null) apiServerProcess.destroy();
-			if (downloadProcess != null) downloadProcess.destroy();
 			System.out.println("Server has been stopped.");
 		}
 	}
@@ -62,105 +52,28 @@ public class PythonServerLauncher {
 	private static void setupVirtualEnvironment() throws IOException, InterruptedException {
 		if (Files.notExists(VENV_PATH)) {
 			System.out.println("Creating virtual environment...");
-
-			// Start the process to create the virtual environment
-			ProcessBuilder processBuilder = new ProcessBuilder(SYSTEM_PYTHON_EXECUTABLE, "-m", "venv", VENV_PATH.toString());
-			Process process = processBuilder.start();
-
-			// Capture and print the output and error streams
-			try (BufferedReader outputReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-					BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-
-				String line;
-
-				// Read and print output stream (normal log messages)
-				while ((line = outputReader.readLine()) != null) {
-					System.out.println("Output: " + line);
-				}
-
-				// Read and print error stream (error messages)
-				while ((line = errorReader.readLine()) != null) {
-					System.err.println("Error: " + line);
-
-				}
-			}
-
-			// Wait for the process to complete
-			int exitCode = process.waitFor();
-			if (exitCode == 0) {
-				System.out.println("Virtual environment created successfully.");
-			} else {
-				System.err.println("Failed to create virtual environment. Exit code: " + exitCode);
-			}
+			runProcess(SYSTEM_PYTHON_EXECUTABLE, "-m", "venv", VENV_PATH.toString());
+			System.out.println("Virtual environment created successfully.");
 		}
 	}
 
 	private static void installPythonDependencies() throws IOException, InterruptedException {
-		System.out.println("Updating pip...");
-		new ProcessBuilder(VENV_EXCECUTABLE , "pip", "install", "--upgrade", "pip").start().waitFor();
-
-		System.out.println("Installing Python dependencies...");
-		Process pipProcess = new ProcessBuilder(VENV_EXCECUTABLE , "pip", "install", "-r", REQUIREMENTS_PATH).start();
-
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(pipProcess.getInputStream()));
-			 BufferedReader errorReader = new BufferedReader(new InputStreamReader(pipProcess.getErrorStream()))) {
-
-			String line;
-			while ((line = reader.readLine()) != null) {
-				System.out.println("Pip Install: " + line);
-			}
-			while ((line = errorReader.readLine()) != null) {
-				System.err.println("Pip Install [ERROR]: " + line);
-			}
-		}
-		pipProcess.waitFor();
+		System.out.println("Updating pip and installing dependencies...");
+		runProcess(VENV_EXECUTABLE.toString(), "-m", "pip", "install", "--upgrade", "pip");
+		runProcess(VENV_EXECUTABLE.toString(), "-m", "pip", "install", "-r", REQUIREMENTS_PATH.toString());
 		System.out.println("Python dependencies installed successfully.");
 	}
 
 	private static void downloadModelIfNeeded() throws IOException, InterruptedException {
-		System.out.println("Checking model folder contents...");
 		if (Files.notExists(MODEL_FOLDER_PATH)) {
 			Files.createDirectory(MODEL_FOLDER_PATH);
 			System.out.println("Model folder created.");
 		}
 
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(MODEL_FOLDER_PATH)) {
-			boolean modelExists = stream.iterator().hasNext();
-			if (!modelExists) {
+			if (!stream.iterator().hasNext()) {
 				System.out.println("Model folder is empty. Downloading model...");
-				ProcessBuilder processBuilder = new ProcessBuilder(VENV_EXCECUTABLE, "server/src/main/java/server/python/Downloader.py");
-				Process downloadProcess = processBuilder.start();
-
-				// Separate Threads to read output and error streams
-				Thread outputThread = new Thread(() -> {
-					try (BufferedReader reader = new BufferedReader(new InputStreamReader(downloadProcess.getInputStream()))) {
-						String line;
-						while ((line = reader.readLine()) != null) {
-							System.out.println(line);
-						}
-					} catch (IOException e) {
-						System.err.println("Error reading download output: " + e.getMessage());
-					}
-				});
-
-				Thread errorThread = new Thread(() -> {
-					try (BufferedReader reader = new BufferedReader(new InputStreamReader(downloadProcess.getErrorStream()))) {
-						String line;
-						while ((line = reader.readLine()) != null) {
-							System.err.println(line);
-						}
-					} catch (IOException e) {
-						System.err.println("Error reading download error output: " + e.getMessage());
-					}
-				});
-
-				outputThread.start();
-				errorThread.start();
-
-				downloadProcess.waitFor();
-				outputThread.join();
-				errorThread.join();
-
+				runProcessAsync(VENV_EXECUTABLE.toString(), "server/src/main/java/server/python/Downloader.py");
 				System.out.println("Model downloaded successfully.");
 			}
 		}
@@ -191,5 +104,44 @@ public class PythonServerLauncher {
 
 	private static boolean isWindows() {
 		return System.getProperty("os.name").toLowerCase().contains("win");
+	}
+
+	private static void runProcess(String... commands) throws IOException, InterruptedException {
+		Process process = new ProcessBuilder(commands).start();
+		try (BufferedReader outputReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+		     BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+			outputReader.lines().forEach(System.out::println);
+			errorReader.lines().forEach(System.err::println);
+		}
+		int exitCode = process.waitFor();
+		if (exitCode != 0) {
+			System.err.println("Process failed with exit code: " + exitCode);
+		}
+	}
+
+	private static void runProcessAsync(String... commands) throws InterruptedException, IOException {
+		Process process = new ProcessBuilder(commands).start();
+
+		Thread outputThread = new Thread(() -> {
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+				reader.lines().forEach(System.out::println);
+			} catch (IOException e) {
+				System.err.println("Error reading process output: " + e.getMessage());
+			}
+		});
+
+		Thread errorThread = new Thread(() -> {
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+				reader.lines().forEach(System.err::println);
+			} catch (IOException e) {
+				System.err.println("Error reading process error: " + e.getMessage());
+			}
+		});
+
+		outputThread.start();
+		errorThread.start();
+		process.waitFor();
+		outputThread.join();
+		errorThread.join();
 	}
 }

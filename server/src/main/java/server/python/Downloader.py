@@ -28,7 +28,7 @@ def download_with_progress(url, destination):
     return True
 
 # Modell und Tokenizer herunterladen und speichern
-def download_model(model_name="mistralai/Mistral-7B-v0.3", save_directory="./model"):
+def download_model(model_name="mistralai/Mistral-7B-v0.3", save_directory="server/src/main/java/server/model/"):
     print(f"Lade das Modell {model_name} herunter...")
     os.makedirs(save_directory, exist_ok=True)
 
