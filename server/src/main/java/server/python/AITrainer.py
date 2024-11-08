@@ -1,67 +1,49 @@
-from datasets import load_dataset, DatasetDict, concatenate_datasets
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+import torch
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM, Trainer, TrainingArguments
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def load_and_prepare_datasets():
-    print("Lade Datensätze...")
+model_name = "distilgpt2"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
 
-    daily_dialog = load_dataset("li2017dailydialog/daily_dialog", trust_remote_code=True)['train']
-    blended_skill_talk = load_dataset("ParlAI/blended_skill_talk")['train']
+dataset = load_dataset("ParlAI/blended_skill_talk")
 
-    combined_train_dataset = concatenate_datasets([daily_dialog, blended_skill_talk])
+def tokenize_function(examples):
+    texts = []
+    if "text" in examples:
+        texts = examples["text"]
+    elif "dialog" in examples:
+        texts = [" ".join(dialog) if isinstance(dialog, list) else str(dialog) for dialog in examples["dialog"]]
 
-    combined_dataset = DatasetDict({
-        'train': combined_train_dataset
-    })
-    return combined_dataset
+    texts = [str(text) for text in texts if isinstance(text, (str, list))]
 
-def train_model(model_directory="C:/Users/NIFA/IdeaProjects/MushroomAI/server/src/main/java/server/model/"):
-    print("Lade Modell und Tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_directory)
-    model = AutoModelForCausalLM.from_pretrained(model_directory)
+    return tokenizer(texts, padding="max_length", truncation=True, max_length=128)
 
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+tokenized_dataset = dataset.map(tokenize_function, batched=True, batch_size=100)
 
-    dataset = load_and_prepare_datasets()
+training_args = TrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=2,
+    per_device_eval_batch_size=2,
+    num_train_epochs=3,
+    weight_decay=0.01,
+)
 
-    def tokenize_function(examples):
-        # Tokenize the text
-        texts = [" ".join(dialog) if isinstance(dialog, list) else dialog for dialog in examples["dialog"]]
-        tokenized_inputs = tokenizer(texts, padding="max_length", truncation=True, max_length=128)
+# Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_dataset["train"],
+    eval_dataset=tokenized_dataset["test"],
+)
 
-        # Set `labels` equal to `input_ids` for causal language modeling
-        tokenized_inputs["labels"] = tokenized_inputs["input_ids"].copy()
-        return tokenized_inputs
+# Train the model
+trainer.train()
 
-    tokenized_dataset = dataset.map(tokenize_function, batched=True, batch_size=100)
-
-    training_args = TrainingArguments(
-        output_dir="./results",
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        per_device_train_batch_size=2,
-        num_train_epochs=3,
-        save_steps=10,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        gradient_accumulation_steps=4
-    )
-
-    eval_dataset = load_dataset("ParlAI/blended_skill_talk", split="validation")
-
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_dataset["train"],
-        eval_dataset=eval_dataset
-    )
-
-    print("Starte Training...")
-    trainer.train()
-    model.save_pretrained(model_directory)
-    tokenizer.save_pretrained(model_directory)
-    print("Training abgeschlossen und Modell gespeichert.")
-
-if __name__ == "__main__":
-    train_model()
+# Save the model
+model.save_pretrained("./trained_model")
+tokenizer.save_pretrained("./trained_model")
