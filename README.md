@@ -15,7 +15,6 @@ This project provides a framework that supports local model training, model cust
   
 2. **Configure Hugging Face API**  
    - Obtain a Hugging Face API token and set it as an environment variable (`HF_TOKEN`) for secure access.
-   - Use the provided script to log in and download models as needed.
 
 3. **Set Up Local Model Directory**  
    - Define a directory where models can be downloaded, trained, and stored.
