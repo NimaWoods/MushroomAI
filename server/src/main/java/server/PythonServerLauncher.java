@@ -1,6 +1,7 @@
 package server;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PythonServerLauncher {
@@ -30,17 +32,12 @@ public class PythonServerLauncher {
 
 	public static void launch() {
 		try {
+			createFilesAndDirectories();
 			setupVirtualEnvironment();
 			installPythonDependencies();
 			downloadModelIfNeeded();
+			startPromptLoop();
 
-			try (Scanner scanner = new Scanner(System.in)) {
-				while (true) {
-					System.out.println("\nEnter a prompt:");
-					String prompt = scanner.nextLine();
-					sendApiRequest(prompt);
-				}
-			}
 		} catch (IOException | InterruptedException e) {
 			System.err.println("Setup error: " + e.getMessage());
 			e.printStackTrace();
@@ -72,11 +69,17 @@ public class PythonServerLauncher {
 
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(MODEL_FOLDER_PATH)) {
 			if (!stream.iterator().hasNext()) {
-				System.out.println("Model folder is empty. Downloading model...");
+				System.out.println("Model folder is empty...");
 				runProcessAsync(VENV_EXECUTABLE.toString(), "server/src/main/java/server/python/Downloader.py");
 				System.out.println("Model downloaded successfully.");
+
+				// Train newly created Model
+				runProcessAsync(VENV_EXECUTABLE.toString(), "server/src/main/java/server/python/AITrainer.py");
+				System.out.println("Model trained successfully.");
 			}
 		}
+		runProcessAsync(VENV_EXECUTABLE.toString(), "server/src/main/java/server/python/AITrainer.py");
+		System.out.println("Model trained successfully.");
 	}
 
 	private static void sendApiRequest(String prompt) {
@@ -143,5 +146,34 @@ public class PythonServerLauncher {
 		process.waitFor();
 		outputThread.join();
 		errorThread.join();
+	}
+
+	public static void createFilesAndDirectories() {
+		try {
+			Files.createDirectories(MODEL_FOLDER_PATH);
+
+			File configFile = new File("/");
+			if (configFile.createNewFile()) {
+				System.out.println("Config file created: " + configFile.getName());
+			} else {
+				System.out.println("Config file already exists.");
+			}
+
+		} catch (IOException e) {
+			System.err.println("Error creating directories: " + e.getMessage());
+		}
+	}
+
+	public static void startPromptLoop() {
+		Scanner scanner = new Scanner(System.in);
+		while (true) {
+			System.out.print("Enter a prompt: ");
+			String prompt = scanner.nextLine();
+			if (prompt.equals("exit")) {
+				break;
+			}
+			sendApiRequest(prompt);
+		}
+		scanner.close();
 	}
 }
