@@ -1,4 +1,4 @@
-# Project Name: Local/Remote AI Client
+# Project Name: Mushroom AI Client/Framework
 
 ## Overview
 **Currently working on:** Implementing a flexible AI client that can operate either locally or via API calls. The goal is to create a fully trainable, extendable, and documentable AI client for various applications.
@@ -22,12 +22,6 @@ This project provides a framework that supports local model training, model cust
 4. **Run the Application**  
    - Start the client in either web or local mode based on configuration preferences.
    - Customize model training and functionality through the sidebar options in the UI.
-
-## Future Goals
-
-- **Enhanced Model Customization**: Additional support for specialized models for NLP, vision, and other domains.
-- **Multi-Platform Compatibility**: Extending the framework to support additional deployment options across different platforms.
-- **User-Friendly Templates**: More customization options for documentation templates.
 
 ---
 
